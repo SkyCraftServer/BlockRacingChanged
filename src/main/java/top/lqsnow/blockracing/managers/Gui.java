@@ -22,7 +22,7 @@ public class Gui {
         if (currentGameState.equals(Game.GameState.INGAME)) new GameMenu().open(player);
     }
 
-    @SuppressWarnings("deprecation") // InventoryView has no component-based title setter in Paper 26.2.
+    @SuppressWarnings("deprecation") // InventoryView has no component-based title setter in Paper 26.3.
     public static void openTeamChest(Player player, int index) {
         if (redTeamPlayers.contains(player.getName())) {
             player.openInventory(redTeamChest.get(index));

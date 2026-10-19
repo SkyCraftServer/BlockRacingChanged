@@ -15,6 +15,7 @@ import top.lqsnow.blockracing.managers.Message;
 import top.lqsnow.blockracing.scoreboard.Scoreboard;
 import top.lqsnow.blockracing.managers.Setting;
 import top.lqsnow.blockracing.menus.GameMenu;
+import top.lqsnow.blockracing.menus.WayPointDialog;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -80,11 +81,7 @@ public class Menu implements CommandExecutor, TabCompleter {
             }
 
             if (args.length == 1) {
-                if (redTeamPlayers.contains(player.getName())) {
-                    new GameMenu.WayPointMenu(redWaypoint, redWaypointIconCache, redWaypointBiomeCache).open(player);
-                } else if (blueTeamPlayers.contains(player.getName())) {
-                    new GameMenu.WayPointMenu(blueWaypoint, blueWaypointIconCache, blueWaypointBiomeCache).open(player);
-                }
+                WayPointDialog.open(player);
                 return true;
             }
 

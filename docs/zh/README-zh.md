@@ -6,9 +6,9 @@
 
 这是一个Minecraft多人竞速小游戏，分为两个队伍，先收集完指定方块的队伍获胜。
 
-插件版本：26.2.1
+插件版本：26.3.1
 
-运行要求：Minecraft Java 版 26.2、Paper 26.2、Java 25。插件直接使用 Paper API，不支持 Spigot。
+运行要求：Minecraft Java 版 26.3、Paper 26.3、Java 25。插件直接使用 Paper API，不支持 Spigot。
 
 ## 升级须知
 
@@ -70,7 +70,7 @@
 
 # 安装教程
 
-1. 准备一个运行 Java 25 的 Paper 26.2 服务器（如果不会，可以去看我的博客里的相关文章，网址lqsnow.top）
+1. 准备一个运行 Java 25 的 Paper 26.3 服务器（如果不会，可以去看我的博客里的相关文章，网址lqsnow.top）
 
 2. 下载插件，将插件放到服务器目录下的`plugins`文件夹中
 

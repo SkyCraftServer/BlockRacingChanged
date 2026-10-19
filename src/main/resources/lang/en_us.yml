@@ -160,7 +160,10 @@ menu:
       - "&cOnce the command is sent, points will be"
       - "&cdeducted whether or not coordinates are obtained!"
     waypoints: "&dWaypoints"
-    waypoints-lore: "&bSave or teleport to waypoints"
+    waypoints-lore:
+      - "&bSave or teleport to waypoints"
+      - "&bLeft-click: open the list menu"
+      - "&bRight-click: open the chest menu with icons"
     random-tp: "&9Random Teleport"
     random-tp-lore:
       - "&bSpend %cost% points to &lrandomly teleport&r&b"
@@ -219,6 +222,25 @@ menu:
         - "&aBiome: %biome%"
         - "&bLeft-click to teleport, right-click to delete"
         - "&bDeleting waypoints requires confirmation in the chat"
+    button:
+      filled: "&6%index%# %dimension%-%biome% %coords%"
+      empty: "&d%index%# Not Set"
+    action:
+      teleport: "&aTeleport"
+      set: "&aSet Waypoint"
+      rename: "&eRename"
+      remove: "&cRemove"
+      back: "&bBack to List"
+      close: "&cClose"
+    dialog:
+      filled:
+        lore:
+          - "&aDimension: %dimension%"
+          - "&aCoordinates: %coords%"
+          - "&aBiome: %biome%"
+      empty:
+        lore:
+          - "&bUse the \"Set Waypoint\" button below to create one"
   all:
     return-back: "&cReturn"
 
@@ -232,7 +254,7 @@ rule-book:
     - "&b&lModes & Scoring\n\n&0Normal: fully random targets\n\nRacing: shared identical targets\n\nSpeed: 3 points per target.\n\nSending blocks to the enemy chest is the independent \"Team Chest Gift\" toggle."
     - "&b&lMenu Features\n\n&0Press Shift+F for the menu.\n\nTeam Chest: shared items\nWaypoints: save/teleport\nReroll: online team vote\nLocate: costs points\nRandom TP: first use free\nSpeed Supplies: 5 points"
     - "&b&lCommands 1/2\n\n&0/language change language\n/randomteam balance teams\n/block <red|blue> <index> show a full target name\n/tp <player> teammate teleport\n/shout <message> global chat"
-    - "&b&lCommands 2/2\n\n&0/menu open menu\n/waypoint remove <index>\n/locatebiome <biome>\n/locatestructure <structure>\n/restartgame vote to reset"
+    - "&b&lCommands 2/2\n\n&0/menu open menu\n/waypoint remove <index>\n/locatebiome <biome|#tag>\n/locatestructure <structure|#tag>\n/restartgame vote to reset"
 
 # Notices
 notice:
@@ -310,6 +332,18 @@ notice:
   buy-locate: "&a%player% purchased the locate command permission!"
   error-command: "&cIncorrect command input!"
   locate-no-permission: "&cYou don't have permission to use that command! Purchase it in the menu!"
+  locate-command-hint: "&eUse &a/locatebiome <biome|#tag> &eor &a/locatestructure <structure|#tag> &eto locate. Each successful locate costs &b%score% &epoints."
+  locate-not-enough-score: "&cLocate failed: your team does not have enough points (needs %score%)."
+  locate-biome-usage: "&cUsage: /locatebiome <biome|#tag>"
+  locate-structure-usage: "&cUsage: /locatestructure <structure>"
+  locate-biome-invalid: "&cInvalid biome name. Check the spelling and try again."
+  locate-structure-invalid: "&cInvalid structure name. Check the spelling and try again."
+  locate-biome-not-found: "&cThat biome could not be found. No points were charged."
+  locate-structure-not-found: "&cThat structure could not be found. No points were charged."
+  locate-biome-success: "&aFound biome &e%biome% &aat &b%x% %y% %z% &7(%distance% blocks away)"
+  locate-structure-success: "&aFound structure &e%structure% &aat &b%x% %y% %z% &7(%distance% blocks away)"
+  locate-biome-team-success: "&b%player% &alocated biome &e%biome% &aat &b%x% %y% %z% &7(%distance% blocks away)"
+  locate-structure-team-success: "&b%player% &alocated structure &e%structure% &aat &b%x% %y% %z% &7(%distance% blocks away)"
   restart: "&b%player% requested a restart! The game will restart if all players on the server agree! Use /restartgame to apply!"
   restart-cancel: "&c%player%'s restart request canceled!"
   game-not-start: "&cThe game has not started!"
@@ -348,4 +382,4 @@ chat:
   team-hint: "&8[&bTip&8] &7You are in team chat. Use &f/shout message&7 or start with &f@ / ! &7to message everyone."
 
 # Internal compatibility value. Do not edit this manually.
-lang-version: 26.2.1
+lang-version: 26.3.1

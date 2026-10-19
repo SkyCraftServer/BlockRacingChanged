@@ -26,7 +26,7 @@ class ResourceCompatibilityTest {
     );
 
     @Test
-    void everyConfiguredBlockExistsInPaper262() throws Exception {
+    void everyConfiguredBlockExistsInPaper263() throws Exception {
         for (String resource : BLOCK_LISTS) {
             for (String name : readLines(resource)) {
                 Material material = Material.getMaterial(name);
@@ -62,18 +62,48 @@ class ResourceCompatibilityTest {
 
     @Test
     void includesMinecraft262Blocks() throws Exception {
+        assertConfiguredContains("SULFUR", "CINNABAR", "SULFUR_SPIKE", "POTENT_SULFUR", "CHISELED_CINNABAR", "CHISELED_SULFUR");
+    }
+
+    @Test
+    void includesMinecraft263Blocks() throws Exception {
+        assertConfiguredContains(
+                "POPLAR_LOG",
+                "POPLAR_PLANKS",
+                "RED_POPLAR_LEAVES",
+                "POPLAR_SHELF",
+                "RED_SHRUB",
+                "SHELF_MUSHROOM",
+                "STRAW_BED",
+                "WHITE_WOOL_SLAB",
+                "BLACK_WOOL_STAIRS",
+                "RED_CONCRETE_SLAB",
+                "LIGHT_BLUE_CONCRETE_STAIRS"
+        );
+    }
+
+    @Test
+    void includesPreviouslyMissingBlocks() throws Exception {
+        assertConfiguredContains(
+                "BIRCH_HANGING_SIGN",
+                "STRIPPED_ACACIA_LOG",
+                "LAPIS_ORE",
+                "DIAMOND_BLOCK",
+                "NETHERITE_BLOCK",
+                "TUBE_CORAL_FAN",
+                "DEAD_HORN_CORAL_BLOCK",
+                "PINK_WOOL",
+                "BLACK_GLAZED_TERRACOTTA",
+                "WHITE_CONCRETE"
+        );
+    }
+
+    private static void assertConfiguredContains(String... names) throws Exception {
         Set<String> configured = new HashSet<>();
         for (String resource : BLOCK_LISTS) {
             configured.addAll(readLines(resource));
         }
-        assertTrue(configured.containsAll(List.of(
-                "SULFUR",
-                "CINNABAR",
-                "SULFUR_SPIKE",
-                "POTENT_SULFUR",
-                "CHISELED_CINNABAR",
-                "CHISELED_SULFUR"
-        )));
+        assertTrue(configured.containsAll(List.of(names)));
     }
 
     private static List<String> readLines(String resource) throws Exception {

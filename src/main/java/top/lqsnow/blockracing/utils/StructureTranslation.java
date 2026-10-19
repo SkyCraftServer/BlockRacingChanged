@@ -40,6 +40,26 @@ public class StructureTranslation {
         return nice;
     }
 
+    /**
+     * Translates a structure from a live-registry key. Vanilla ids keep the historic
+     * {@code structure.minecraft.<id>} lookup; namespaced (datapack) structures fall
+     * back to a readable version of their path so addon structures stay usable.
+     */
+    public static String getValue(org.bukkit.NamespacedKey structureKey) {
+        if (structureKey == null) {
+            return "";
+        }
+        return getValue(structureKey.getKey());
+    }
+
+    /** Translates a structure taken straight from the live structure registry. */
+    public static String getValue(org.bukkit.generator.structure.Structure structure) {
+        if (structure == null) {
+            return "";
+        }
+        return getValue(structure.key().value());
+    }
+
     private static File resolveLangFile() {
         String langCode = Message.getLanguageCode();
         File dir = new File(Main.getInstance().getDataFolder(), "minecraftlang");

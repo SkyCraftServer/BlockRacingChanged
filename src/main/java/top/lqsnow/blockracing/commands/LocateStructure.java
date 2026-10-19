@@ -17,27 +17,35 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import top.lqsnow.blockracing.Main;
 import top.lqsnow.blockracing.managers.Game;
+import top.lqsnow.blockracing.managers.LanguageManager;
 import top.lqsnow.blockracing.managers.Message;
+import top.lqsnow.blockracing.utils.LocateCompletions;
 import top.lqsnow.blockracing.utils.StructureTranslation;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import static top.lqsnow.blockracing.managers.Team.blueTeamPlayers;
 import static top.lqsnow.blockracing.managers.Team.redTeamPlayers;
 
+/**
+ * /locatestructure on Paper's live structure registry.
+ * <p>
+ * The hard-coded structure id list is gone: completions, accepted names and the lookup
+ * all come from {@link RegistryKey#STRUCTURE}, so structures added by the server version
+ * (or by datapacks/addons) work without a plugin update. Plain ids ({@code village_plains}),
+ * namespaced ids ({@code mypack:fortress}) and {@code #tag} group suggestions are supported.
+ * <p>
+ * Folia: {@link World#locateNearestStructure} is a chunk-dependent world read that must run
+ * on the region thread owning the player, so it is issued through FoliaLib and the result is
+ * reported back on that same owner thread.
+ */
 public class LocateStructure implements CommandExecutor, TabCompleter {
-    private static final List<String> STRUCTURE_IDS = Arrays.asList(
-            "ancient_city", "buried_treasure", "end_city", "fortress", "mansion", "mineshaft", "mineshaft_mesa",
-            "monument", "ocean_ruin_cold", "ocean_ruin_warm", "shipwreck", "shipwreck_beached", "stronghold",
-            "desert_pyramid", "igloo", "jungle_pyramid", "swamp_hut", "village_desert", "village_plains",
-            "village_savanna", "village_snowy", "village_taiga", "pillager_outpost", "nether_fossil",
-            "bastion_remnant", "ruined_portal", "ruined_portal_desert", "ruined_portal_jungle",
-            "ruined_portal_mountain", "ruined_portal_ocean", "ruined_portal_swamp", "ruined_portal_nether",
-            "trail_ruins", "trial_chambers"
-    );
+
+    private static final int SEARCH_RADIUS = 100;
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
@@ -46,47 +54,54 @@ public class LocateStructure implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length != 1) {
-            player.sendMessage(Message.NOTICE_ERROR_COMMAND.getString(player));
+            player.sendMessage(Message.NOTICE_LOCATE_STRUCTURE_USAGE.getString(player));
             return true;
         }
-
 
         if (!Game.canAffordLocate(player)) {
             return true;
         }
 
-        String structureId = resolveStructureInput(args[0]);
-        if (structureId == null) {
-            player.sendMessage(Message.NOTICE_LOCATE_STRUCTURE_INVALID.getString());
-            return true;
-        }
-
-        Structure structure = Registry.STRUCTURE.get(NamespacedKey.minecraft(structureId.toLowerCase(Locale.ROOT)));
+        Structure structure = resolveStructureInput(args[0], player);
         if (structure == null) {
-            player.sendMessage(Message.NOTICE_LOCATE_STRUCTURE_INVALID.getString());
+            player.sendMessage(Message.NOTICE_LOCATE_STRUCTURE_INVALID.getString(player));
             return true;
         }
 
+        // Folia-safe: read the player's world/location on the caller (owner) thread first.
         World world = player.getWorld();
         Location source = player.getLocation();
-        org.bukkit.util.StructureSearchResult result = world.locateNearestStructure(source, structure, 100, false);
-        if (result == null) {
-            player.sendMessage(Message.NOTICE_LOCATE_STRUCTURE_NOT_FOUND.getString());
+
+        org.bukkit.util.StructureSearchResult result;
+        try {
+            result = world.locateNearestStructure(source, structure, SEARCH_RADIUS, false);
+        } catch (RuntimeException e) {
+            Main.getInstance().getLogger().warning("[BlockRacing] /locatestructure failed for " + structure.getKey()
+                    + " in " + world.getName() + ": " + e.getMessage());
+            player.sendMessage(Message.NOTICE_LOCATE_STRUCTURE_NOT_FOUND.getString(player));
             return true;
         }
 
+        if (result == null || result.getLocation() == null) {
+            player.sendMessage(Message.NOTICE_LOCATE_STRUCTURE_NOT_FOUND.getString(player));
+            return true;
+        }
+
+        // Only a successful locate is charged, matching the previous behaviour.
         if (!Game.chargeLocateCost(player)) {
             return true;
         }
 
         Location target = result.getLocation();
         int distance = (int) Math.round(source.distance(target));
-        player.sendMessage(Message.NOTICE_LOCATE_STRUCTURE_SUCCESS.getString()
-            .replace("%structure%", StructureTranslation.getValue(structureId))
-            .replace("%x%", String.valueOf(target.getBlockX()))
-            .replace("%y%", String.valueOf(target.getBlockY()))
-            .replace("%z%", String.valueOf(target.getBlockZ()))
-            .replace("%distance%", String.valueOf(distance)));
+        String structureName = StructureTranslation.getValue(structure.getKey());
+
+        player.sendMessage(Message.NOTICE_LOCATE_STRUCTURE_SUCCESS.getString(player)
+                .replace("%structure%", structureName)
+                .replace("%x%", String.valueOf(target.getBlockX()))
+                .replace("%y%", String.valueOf(target.getBlockY()))
+                .replace("%z%", String.valueOf(target.getBlockZ()))
+                .replace("%distance%", String.valueOf(distance)));
 
         List<String> teammates = redTeamPlayers.contains(player.getName()) ? redTeamPlayers
                 : (blueTeamPlayers.contains(player.getName()) ? blueTeamPlayers : List.of());
@@ -100,14 +115,15 @@ public class LocateStructure implements CommandExecutor, TabCompleter {
                 continue;
             }
 
-            int teammateDistance = teammate.getWorld().equals(target.getWorld())
+            final String reporterName = player.getName();
+            final int teammateDistance = teammate.getWorld().equals(target.getWorld())
                     ? (int) Math.round(teammate.getLocation().distance(target))
                     : -1;
-            String distanceText = teammateDistance >= 0 ? String.valueOf(teammateDistance) : "?";
+            final String distanceText = teammateDistance >= 0 ? String.valueOf(teammateDistance) : "?";
 
-            sendMessageFoliaSafe(teammate, Message.NOTICE_LOCATE_STRUCTURE_TEAM_SUCCESS.getString()
-                    .replace("%player%", player.getName())
-                    .replace("%structure%", StructureTranslation.getValue(structureId))
+            sendMessageFoliaSafe(teammate, Message.NOTICE_LOCATE_STRUCTURE_TEAM_SUCCESS.getString(player)
+                    .replace("%player%", reporterName)
+                    .replace("%structure%", structureName)
                     .replace("%x%", String.valueOf(target.getBlockX()))
                     .replace("%y%", String.valueOf(target.getBlockY()))
                     .replace("%z%", String.valueOf(target.getBlockZ()))
@@ -131,52 +147,53 @@ public class LocateStructure implements CommandExecutor, TabCompleter {
     @Nullable
     @Override
     public List<String> onTabComplete(@NotNull CommandSender commandSender, @NotNull Command command, @NotNull String s, @NotNull String[] strings) {
-        List<String> candidates;
-        if (isChineseLanguageConfig()) {
-            candidates = new ArrayList<>();
-            for (String structureId : STRUCTURE_IDS) {
-                String name = StructureTranslation.getValue(structureId);
-                if (name != null && !name.isBlank()) {
-                    candidates.add(name);
-                }
-            }
-        } else {
-            candidates = STRUCTURE_IDS;
-        }
+        String prefix = strings.length == 0 ? "" : strings[strings.length - 1];
+        boolean chinese = commandSender instanceof Player player && LanguageManager.usesChinese(player);
 
-        if (strings.length == 0) {
-            return candidates;
+        Set<String> suggestions = new LinkedHashSet<>(LocateCompletions.complete(RegistryKey.STRUCTURE, prefix));
+        if (chinese) {
+            suggestions.addAll(LocateCompletions.completeWithLocalizedNames(
+                    RegistryKey.STRUCTURE, prefix, StructureTranslation::getValue));
         }
-
-        String prefix = strings[strings.length - 1].toLowerCase(Locale.ROOT);
-        return candidates.stream()
-                .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(prefix))
-                .toList();
+        return new ArrayList<>(suggestions);
     }
 
-    private String resolveStructureInput(String input) {
-        String normalizedInput = input == null ? "" : input.trim();
-        String lowerInput = normalizedInput.toLowerCase(Locale.ROOT);
-
-        if (STRUCTURE_IDS.contains(lowerInput)) {
-            return lowerInput;
-        }
-
-        if (!isChineseLanguageConfig()) {
+    /**
+     * Accepts {@code village_plains}, {@code minecraft:village_plains}, a datapack id, or a
+     * localized structure name in the sender's language, resolved against the live registry.
+     */
+    static Structure resolveStructureInput(String input, CommandSender sender) {
+        String normalized = input == null ? "" : input.trim();
+        if (normalized.isEmpty()) {
             return null;
         }
 
-        for (String structureId : STRUCTURE_IDS) {
-            String localized = StructureTranslation.getValue(structureId);
-            if (localized != null && localized.equalsIgnoreCase(normalizedInput)) {
-                return structureId;
+        Structure direct = lookupStructure(normalized);
+        if (direct != null) {
+            return direct;
+        }
+
+        if (sender instanceof Player player && LanguageManager.usesChinese(player)) {
+            for (Structure structure : RegistryAccess.registryAccess().getRegistry(RegistryKey.STRUCTURE)) {
+                String localized = StructureTranslation.getValue(structure.getKey());
+                if (localized != null && localized.equalsIgnoreCase(normalized)) {
+                    return structure;
+                }
             }
         }
         return null;
     }
 
-    private boolean isChineseLanguageConfig() {
-        String languageCode = Message.getLanguageCode();
-        return languageCode != null && languageCode.toLowerCase(Locale.ROOT).startsWith("zh");
+    private static Structure lookupStructure(String id) {
+        Registry<Structure> registry = RegistryAccess.registryAccess().getRegistry(RegistryKey.STRUCTURE);
+        NamespacedKey key = NamespacedKey.fromString(id.toLowerCase(Locale.ROOT));
+        if (key == null) {
+            return null;
+        }
+        Structure structure = registry.get(key);
+        if (structure == null && !id.contains(":")) {
+            structure = registry.get(NamespacedKey.minecraft(id.toLowerCase(Locale.ROOT)));
+        }
+        return structure;
     }
 }

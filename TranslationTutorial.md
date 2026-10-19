@@ -2,7 +2,7 @@
 
 [English](./docs/en/TranslationTutorial-en.md) | [简体中文](./TranslationTutorial.md)
 
-BlockRacing 26.2.1 内置简体中文和英文，并允许每位玩家独立选择语言。
+BlockRacing 26.3.1 内置简体中文和英文，并允许每位玩家独立选择语言。
 
 ## 玩家切换语言
 

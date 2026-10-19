@@ -1461,6 +1461,33 @@ public class Game {
         };
     }
 
+    public static Material getWaypointIcon(String team, int index) {
+        Material icon = switch (team) {
+            case "red" -> redWaypointIconCache.get(index);
+            case "blue" -> blueWaypointIconCache.get(index);
+            default -> null;
+        };
+        // 记录的图标材质可能不是有效物品（例如水下记录时可能是 WATER/LAVA），
+        // 必须回退为环境图标，否则 new ItemStack(...) 会抛 "isn't an item"。
+        if (icon != null && icon.isItem()) {
+            return icon;
+        }
+        return fallbackWaypointIcon(team, index);
+    }
+
+    private static Material fallbackWaypointIcon(String team, int index) {
+        Location waypoint = getWaypoint(team, index);
+        if (waypoint == null || waypoint.getWorld() == null) {
+            return Material.FILLED_MAP;
+        }
+        return switch (waypoint.getWorld().getEnvironment()) {
+            case NORMAL -> Material.GRASS_BLOCK;
+            case NETHER -> Material.NETHERRACK;
+            case THE_END -> Material.END_STONE;
+            default -> Material.FILLED_MAP;
+        };
+    }
+
     public static void setWaypoint(Player player, String team, int index) {
         Location waypoint = player.getLocation();
         String biomeLabel = "N/A";
@@ -1486,6 +1513,20 @@ public class Game {
         }
     }
 
+    /**
+     * Dialog 专用：按编号直接设置传送点（不使用点击语义）。
+     *
+     * <p>Dialog API 不支持 shift+左键 / 左右键区分操作，因此不复用
+     * {@link #waypoint(Player, int, ClickType)} 的 ClickType 分支。</p>
+     */
+    public static void setWaypoint(Player player, int index) {
+        String team = resolvePlayerTeam(player);
+        if (team.isEmpty()) {
+            return;
+        }
+        setWaypoint(player, team, index);
+    }
+
     private static Material resolveWaypointIconAtRecord(Location waypoint) {
         if (waypoint == null || waypoint.getWorld() == null) {
             return Material.FILLED_MAP;
@@ -1493,13 +1534,14 @@ public class Game {
 
         try {
             org.bukkit.block.Block block = waypoint.getBlock();
-            while (block.isEmpty() && block.getY() > waypoint.getWorld().getMinHeight()) {
+            // 跳过空气与流体（水/岩浆），避免记录到 WATER/LAVA 等非物品材质。
+            while ((block.isEmpty() || block.isLiquid()) && block.getY() > waypoint.getWorld().getMinHeight()) {
                 block = block.getRelative(0, -1, 0);
             }
 
             if (!block.isEmpty()) {
                 Material material = block.getType();
-                if (material != null) {
+                if (material != null && material.isItem()) {
                     return material;
                 }
             }
@@ -1531,6 +1573,47 @@ public class Game {
             }
             default -> false;
         };
+    }
+
+    /**
+     * Dialog 专用：按编号直接删除传送点并广播（不使用点击语义）。
+     *
+     * @return 是否成功删除
+     */
+    public static boolean removeWaypoint(Player player, int index) {
+        String team = resolvePlayerTeam(player);
+        if (team.isEmpty()) {
+            return false;
+        }
+        if (removeWaypoint(team, index)) {
+            if ("red".equals(team)) {
+                sendRed(Message.NOTICE_RED_REMOVE_WAYPOINT.getString().replace("%player%", player.getName()).replace("%index%", String.valueOf(index)));
+            } else {
+                sendBlue(Message.NOTICE_BLUE_REMOVE_WAYPOINT.getString().replace("%player%", player.getName()).replace("%index%", String.valueOf(index)));
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Dialog 专用：按编号直接传送到传送点并发送成功提示（不使用点击语义）。
+     */
+    public static void teleportToWaypoint(Player player, int index) {
+        String team = resolvePlayerTeam(player);
+        if (team.isEmpty()) {
+            return;
+        }
+        Location waypoint = getWaypoint(team, index);
+        if (waypoint == null) {
+            return;
+        }
+        teleportPlayer(player, waypoint);
+        String x = String.format("%.1f", waypoint.getX());
+        String y = String.format("%.1f", waypoint.getY());
+        String z = String.format("%.1f", waypoint.getZ());
+        player.sendMessage(Message.NOTICE_TP_SUCCESS.getString().replace("%x%", x).replace("%y%", y)
+                .replace("%z%", z));
     }
 
     private static void teleportPlayer(Player player, Location location) {

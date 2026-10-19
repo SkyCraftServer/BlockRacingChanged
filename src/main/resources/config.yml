@@ -161,4 +161,4 @@ max-roll-count: 3
 regenerate-worlds-on-startup: false
 
 # 如果你不知道这是什么，不要动它
-config-version: 26.2.1
+config-version: 26.3.1

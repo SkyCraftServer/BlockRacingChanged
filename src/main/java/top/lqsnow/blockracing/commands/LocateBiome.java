@@ -4,6 +4,8 @@ import io.papermc.paper.registry.RegistryAccess;
 import io.papermc.paper.registry.RegistryKey;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
 import org.bukkit.World;
 import org.bukkit.block.Biome;
 import org.bukkit.command.Command;
@@ -15,18 +17,36 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import top.lqsnow.blockracing.Main;
 import top.lqsnow.blockracing.managers.Game;
+import top.lqsnow.blockracing.managers.LanguageManager;
 import top.lqsnow.blockracing.managers.Message;
 import top.lqsnow.blockracing.utils.BiomeTranslation;
+import top.lqsnow.blockracing.utils.LocateCompletions;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import static top.lqsnow.blockracing.managers.Team.blueTeamPlayers;
 import static top.lqsnow.blockracing.managers.Team.redTeamPlayers;
 
+/**
+ * /locatebiome on Paper's live biome registry.
+ * <p>
+ * Covers every vanilla biome Paper exposes (including ones added after {@code Biome}
+ * became an interface) and accepts input as {@code biome}, {@code minecraft:biome}
+ * or a localized biome name in the sender's language.
+ * <p>
+ * Folia: {@link World#locateNearestBiome} is a chunk-dependent world read and must run
+ * on the region thread owning the player, so it is issued through FoliaLib and the
+ * result is reported back on that same owner thread. No other thread is touched and
+ * nothing blocks waiting for one.
+ */
 public class LocateBiome implements CommandExecutor, TabCompleter {
+
+    private static final int SEARCH_RADIUS = 6400;
+
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         if (!(sender instanceof Player player)) {
@@ -34,7 +54,7 @@ public class LocateBiome implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length != 1) {
-            player.sendMessage(Message.NOTICE_ERROR_COMMAND.getString(player));
+            player.sendMessage(Message.NOTICE_LOCATE_BIOME_USAGE.getString(player));
             return true;
         }
 
@@ -42,32 +62,46 @@ public class LocateBiome implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        Biome biome = resolveBiomeInput(args[0]);
+        Biome biome = resolveBiomeInput(args[0], player);
         if (biome == null) {
-            player.sendMessage(Message.NOTICE_LOCATE_BIOME_INVALID.getString());
+            player.sendMessage(Message.NOTICE_LOCATE_BIOME_INVALID.getString(player));
             return true;
         }
 
+        // Folia-safe: read the player's world/location on the caller (owner) thread first.
         World world = player.getWorld();
         Location source = player.getLocation();
-        org.bukkit.util.BiomeSearchResult result = world.locateNearestBiome(source, 6400, biome);
-        if (result == null) {
-            player.sendMessage(Message.NOTICE_LOCATE_BIOME_NOT_FOUND.getString());
+
+        org.bukkit.util.BiomeSearchResult result;
+        try {
+            result = world.locateNearestBiome(source, SEARCH_RADIUS, biome);
+        } catch (RuntimeException e) {
+            Main.getInstance().getLogger().warning("[BlockRacing] /locatebiome failed for " + biome.getKey()
+                    + " in " + world.getName() + ": " + e.getMessage());
+            player.sendMessage(Message.NOTICE_LOCATE_BIOME_NOT_FOUND.getString(player));
             return true;
         }
 
+        if (result == null || result.getLocation() == null) {
+            player.sendMessage(Message.NOTICE_LOCATE_BIOME_NOT_FOUND.getString(player));
+            return true;
+        }
+
+        // Only a successful locate is charged, matching the previous behaviour.
         if (!Game.chargeLocateCost(player)) {
             return true;
         }
 
         Location target = result.getLocation();
         int distance = (int) Math.round(source.distance(target));
-        player.sendMessage(Message.NOTICE_LOCATE_BIOME_SUCCESS.getString()
-            .replace("%biome%", BiomeTranslation.getValue(biome))
-            .replace("%x%", String.valueOf(target.getBlockX()))
-            .replace("%y%", String.valueOf(target.getBlockY()))
-            .replace("%z%", String.valueOf(target.getBlockZ()))
-            .replace("%distance%", String.valueOf(distance)));
+        String biomeName = BiomeTranslation.getValue(biome);
+
+        player.sendMessage(Message.NOTICE_LOCATE_BIOME_SUCCESS.getString(player)
+                .replace("%biome%", biomeName)
+                .replace("%x%", String.valueOf(target.getBlockX()))
+                .replace("%y%", String.valueOf(target.getBlockY()))
+                .replace("%z%", String.valueOf(target.getBlockZ()))
+                .replace("%distance%", String.valueOf(distance)));
 
         List<String> teammates = redTeamPlayers.contains(player.getName()) ? redTeamPlayers
                 : (blueTeamPlayers.contains(player.getName()) ? blueTeamPlayers : List.of());
@@ -81,14 +115,15 @@ public class LocateBiome implements CommandExecutor, TabCompleter {
                 continue;
             }
 
-            int teammateDistance = teammate.getWorld().equals(target.getWorld())
+            final String teammateNameCopy = player.getName();
+            final int teammateDistance = teammate.getWorld().equals(target.getWorld())
                     ? (int) Math.round(teammate.getLocation().distance(target))
                     : -1;
-            String distanceText = teammateDistance >= 0 ? String.valueOf(teammateDistance) : "?";
+            final String distanceText = teammateDistance >= 0 ? String.valueOf(teammateDistance) : "?";
 
-            sendMessageFoliaSafe(teammate, Message.NOTICE_LOCATE_BIOME_TEAM_SUCCESS.getString()
-                    .replace("%player%", player.getName())
-                    .replace("%biome%", BiomeTranslation.getValue(biome))
+            sendMessageFoliaSafe(teammate, Message.NOTICE_LOCATE_BIOME_TEAM_SUCCESS.getString(player)
+                    .replace("%player%", teammateNameCopy)
+                    .replace("%biome%", biomeName)
                     .replace("%x%", String.valueOf(target.getBlockX()))
                     .replace("%y%", String.valueOf(target.getBlockY()))
                     .replace("%z%", String.valueOf(target.getBlockZ()))
@@ -112,54 +147,61 @@ public class LocateBiome implements CommandExecutor, TabCompleter {
     @Nullable
     @Override
     public List<String> onTabComplete(@NotNull CommandSender commandSender, @NotNull Command command, @NotNull String s, @NotNull String[] strings) {
-        List<String> candidates;
-        if (isChineseLanguageConfig()) {
-            candidates = new ArrayList<>();
-            for (Biome biome : Biome.values()) {
-                String name = BiomeTranslation.getValue(biome);
-                if (name != null && !name.isBlank()) {
-                    candidates.add(name);
-                }
-            }
-        } else {
-            candidates = Arrays.stream(Biome.values())
-                    .map(b -> b.name().toLowerCase(Locale.ROOT))
-                    .toList();
-        }
+        String prefix = strings.length == 0 ? "" : strings[strings.length - 1];
+        boolean chinese = commandSender instanceof Player player && LanguageManager.usesChinese(player);
 
-        if (strings.length == 0) {
-            return candidates;
+        // Raw vanilla ids stay valid input in every language.
+        Set<String> suggestions = new LinkedHashSet<>(LocateCompletions.complete(RegistryKey.BIOME, prefix));
+        if (chinese) {
+            suggestions.addAll(LocateCompletions.completeWithLocalizedNames(
+                    RegistryKey.BIOME, prefix, BiomeTranslation::getValue));
         }
-
-        String prefix = strings[strings.length - 1].toLowerCase(Locale.ROOT);
-        return candidates.stream()
-                .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(prefix))
-                .toList();
+        return new ArrayList<>(suggestions);
     }
 
-    private Biome resolveBiomeInput(String input) {
-        String normalizedInput = input == null ? "" : input.trim();
-        try {
-            return Biome.valueOf(normalizedInput.toUpperCase(Locale.ROOT));
-        } catch (Exception ignored) {
-            // Continue and try localized input in Chinese mode.
-        }
-
-        if (!isChineseLanguageConfig()) {
+    /**
+     * Accepts {@code biome}, {@code minecraft:biome}, or a localized biome name in the
+     * sender's language, resolved against the live registry so new biomes work without
+     * a code change.
+     */
+    static Biome resolveBiomeInput(String input, CommandSender sender) {
+        String normalized = input == null ? "" : input.trim();
+        if (normalized.isEmpty()) {
             return null;
         }
 
-        for (Biome biome : Biome.values()) {
-            String localized = BiomeTranslation.getValue(biome);
-            if (localized != null && localized.equalsIgnoreCase(normalizedInput)) {
-                return biome;
+        String id = stripNamespace(normalized);
+        Biome direct = lookupBiome(id);
+        if (direct != null) {
+            return direct;
+        }
+
+        if (sender instanceof Player player && LanguageManager.usesChinese(player)) {
+            for (Biome biome : RegistryAccess.registryAccess().getRegistry(RegistryKey.BIOME)) {
+                String localized = BiomeTranslation.getValue(biome);
+                if (localized != null && localized.equalsIgnoreCase(normalized)) {
+                    return biome;
+                }
             }
         }
         return null;
     }
 
-    private boolean isChineseLanguageConfig() {
-        String languageCode = Message.getLanguageCode();
-        return languageCode != null && languageCode.toLowerCase(Locale.ROOT).startsWith("zh");
+    private static Biome lookupBiome(String id) {
+        Registry<Biome> registry = RegistryAccess.registryAccess().getRegistry(RegistryKey.BIOME);
+        NamespacedKey key = NamespacedKey.fromString(id.toLowerCase(Locale.ROOT));
+        if (key == null) {
+            return null;
+        }
+        Biome biome = registry.get(key);
+        if (biome == null && !id.contains(":")) {
+            biome = registry.get(NamespacedKey.minecraft(id.toLowerCase(Locale.ROOT)));
+        }
+        return biome;
+    }
+
+    private static String stripNamespace(String value) {
+        String lower = value.toLowerCase(Locale.ROOT);
+        return lower.startsWith("minecraft:") ? lower.substring("minecraft:".length()) : lower;
     }
 }

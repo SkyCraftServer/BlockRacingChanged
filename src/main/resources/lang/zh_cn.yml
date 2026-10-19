@@ -235,7 +235,10 @@ menu:
       - "&c注意！请确保语法正确，且结构存在于当前维度！"
       - "&c仅当成功获取到坐标时才会扣除积分！"
     waypoints: "&d记录点"
-    waypoints-lore: "&b保存或传送至记录点"
+    waypoints-lore:
+      - "&b保存或传送至记录点"
+      - "&b左键：打开列表菜单"
+      - "&b右键：打开带图标的箱子菜单"
     random-tp: "&9随机传送"
     random-tp-lore:
       - "&b花费%cost%积分在&l%dimension%&r&b随机传送，首次免费"
@@ -296,6 +299,25 @@ menu:
         - "&a群系：%biome%"
         - "&b左键点击传送，右键点击重命名"
         - "&bShift+左键点击删除"
+    button:
+      filled: "&6%index%# %dimension%-%biome% %coords%"
+      empty: "&d%index%# 未设置"
+    action:
+      teleport: "&a传送"
+      set: "&a设置传送点"
+      rename: "&e重命名"
+      remove: "&c删除"
+      back: "&b返回列表"
+      close: "&c关闭"
+    dialog:
+      filled:
+        lore:
+          - "&a维度：%dimension%"
+          - "&a坐标：%coords%"
+          - "&a群系：%biome%"
+      empty:
+        lore:
+          - "&b点击下方「设置传送点」按钮创建"
   all:
     return-back: "&c返回"
 
@@ -315,7 +337,7 @@ rule-book:
     - "&b&l模式与积分\n\n&0普通：两队目标完全随机\n\n竞速：两队共享相同目标\n\n极速：每个目标3分\n\n给对方的队伍箱子送方块由独立开关「队伍箱子馈赠」控制"
     - "&b&l菜单功能\n\n&0按 Shift+F 打开菜单\n\n队伍箱子：共享物品\n记录点：保存/传送\n轮换：全队投票\n定位：消耗积分\n随机传送：首次免费\n极速补给：5积分"
     - "&b&l命令 1/2\n\n&0/language 切换语言\n/randomteam 平衡分队\n/block <队伍> <编号> 查看完整目标名\n/tp <玩家> 队友传送\n/shout <消息> 全服聊天"
-    - "&b&l命令 2/2\n\n&0/menu 打开菜单\n/waypoint remove <编号>\n/locatebiome <群系>\n/locatestructure <结构>\n/restartgame 投票重置"
+    - "&b&l命令 2/2\n\n&0/menu 打开菜单\n/waypoint remove <编号>\n/locatebiome <群系|#标签>\n/locatestructure <结构|#标签>\n/restartgame 投票重置"
 
 # 提示
 notice:
@@ -409,9 +431,9 @@ notice:
   locate-already-bought: "&c您已经购买过一次定位命令了！请先使用后再购买！"
   buy-locate: "&a%player% 购买了定位命令权限！"
   locate-no-permission: "&c您没有权限使用该命令！请在菜单中购买！"
-  locate-command-hint: "&e使用 &a/locatebiome <生物群系> &e或 &a/locatestructure <结构> &e进行定位，每次成功定位消耗 &b%score% &e积分。"
+  locate-command-hint: "&e使用 &a/locatebiome <生物群系|#标签> &e或 &a/locatestructure <结构|#标签> &e进行定位，每次成功定位消耗 &b%score% &e积分。"
   locate-not-enough-score: "&c定位失败：队伍积分不足（需要%score%分）。"
-  locate-biome-usage: "&c用法错误：/locatebiome <生物群系>"
+  locate-biome-usage: "&c用法错误：/locatebiome <生物群系|#标签>"
   locate-structure-usage: "&c用法错误：/locatestructure <结构>"
   locate-biome-invalid: "&c生物群系名称无效，请检查拼写后重试。"
   locate-structure-invalid: "&c结构名称无效，请检查拼写后重试。"
@@ -467,4 +489,4 @@ notice:
     divider: "&8&m--------------------------------"
 
 # 如果你不知道这是什么，不要动它
-lang-version: 26.2.1
+lang-version: 26.3.1
