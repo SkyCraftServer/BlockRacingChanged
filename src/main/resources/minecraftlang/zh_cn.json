@@ -2138,5 +2138,7 @@
   "block.minecraft.white_concrete_slab": "白色混凝土台阶",
   "block.minecraft.white_concrete_stairs": "白色混凝土楼梯",
   "block.minecraft.yellow_concrete_slab": "黄色混凝土台阶",
-  "block.minecraft.yellow_concrete_stairs": "黄色混凝土楼梯"
+  "block.minecraft.yellow_concrete_stairs": "黄色混凝土楼梯",
+  "biome.minecraft.dappled_forest": "斑驳森林",
+  "biome.minecraft.sulfur_caves": "硫黄洞穴"
 }

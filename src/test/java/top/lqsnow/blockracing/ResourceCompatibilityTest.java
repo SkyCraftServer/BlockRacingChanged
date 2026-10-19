@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -96,6 +97,31 @@ class ResourceCompatibilityTest {
                 "BLACK_GLAZED_TERRACOTTA",
                 "WHITE_CONCRETE"
         );
+    }
+
+    @Test
+    void translationsCoverEveryVanillaBlockAndBiome() throws Exception {
+        JSONObject english = readJson("minecraftlang/en_us.json");
+        JSONObject chinese = readJson("minecraftlang/zh_cn.json");
+        // Vanilla 26.3 ships 1975 block names and 67 (non-removed) biomes in en_us.
+        assertEquals(1975, countKeys(english, "block.minecraft."), "en_us.json block coverage drifted");
+        assertEquals(1975, countKeys(chinese, "block.minecraft."), "zh_cn.json block coverage drifted");
+        assertEquals(67, countKeys(english, "biome.minecraft."), "en_us.json biome coverage drifted");
+        assertEquals(67, countKeys(chinese, "biome.minecraft."), "zh_cn.json biome coverage drifted");
+        for (String key : List.of(
+                "block.minecraft.poplar_leaves",
+                "block.minecraft.poplar_wall_sign",
+                "block.minecraft.poplar_wall_hanging_sign",
+                "block.minecraft.potted_poplar_sapling",
+                "biome.minecraft.dappled_forest",
+                "biome.minecraft.sulfur_caves")) {
+            assertTrue(english.containsKey(key), () -> "en_us.json is missing " + key);
+            assertTrue(chinese.containsKey(key), () -> "zh_cn.json is missing " + key);
+        }
+    }
+
+    private static long countKeys(JSONObject json, String prefix) {
+        return json.keySet().stream().filter(key -> key.toString().startsWith(prefix)).count();
     }
 
     private static void assertConfiguredContains(String... names) throws Exception {
